@@ -16,9 +16,13 @@
     "@grafana/data": "latest",
     "@grafana/toolkit": "latest",
     "@grafana/ui": "latest",
+    "@types/d3": "^7.1.0",
     "emotion": "10.0.27"
   },
   "engines": {
     "node": ">=14"
+  },
+  "dependencies": {
+    "react-chord-diagram": "^2.0.0"
   }
 }
