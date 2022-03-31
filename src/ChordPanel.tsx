@@ -1,9 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { PanelProps } from '@grafana/data';
 import { ChordOptions } from 'types';
-// import { useTheme } from '@grafana/ui';
-import * as d3 from 'd3';
-// import { ChordGroup, ChordSubgroup } from 'd3';
+import * as d3 from 'my-d3';
+// import * as d3chord from 'd3-chord';
 
 interface Props extends PanelProps<ChordOptions> {}
 
@@ -24,19 +23,36 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
 
       // create input data: a square matrix that provides flow between entities
       var matrix = [
-        [11975, 5871, 8916, 2868],
-        [1951, 10048, 2060, 6171],
-        [8010, 16145, 8090, 8045],
-        [1013, 990, 940, 6907],
+        [0, 5871, 8916, 2868],
+        [1951, 0, 2060, 6171],
+        [8010, 16145, 0, 8045],
+        [1013, 990, 940, 0],
       ];
 
-      // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
-      var res = d3
-        .chord()
-        .padAngle(0.05) // padding between entities (black arc)
-        .sortSubgroups(d3.descending)(matrix);
+      // const names = ['A', 'B', 'C', 'D'];
 
-      // Enter new D3 elements
+      // 4 groups, so create a vector of 4 colors
+      var colors = ['#440154ff', '#31668dff', '#37b578ff', '#fde725ff'];
+
+      let outerRadius = Math.min(width, height) * 0.5 - 125,
+        innerRadius = outerRadius - 10;
+
+      const chord = d3
+        .chordDirected()
+        .padAngle(10 / innerRadius)
+        .sortSubgroups(d3.descending)
+        .sortChords(d3.descending);
+
+      const arc = d3.arc<d3.ChordGroup>().innerRadius(innerRadius).outerRadius(outerRadius);
+
+      const ribbon = d3
+        .ribbonArrow<d3.Chord, d3.ChordSubgroup>()
+        .radius(innerRadius - 1)
+        .padAngle(1 / innerRadius);
+
+      // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
+      var res = chord(matrix);
+
       update
         .datum(res)
         .append('g')
@@ -49,9 +65,35 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .append('path')
         .style('fill', 'grey')
         .style('stroke', 'black')
-        .attr('d', d3.arc<d3.ChordGroup>().innerRadius(200).outerRadius(210));
+        .attr('d', arc);
 
-      // Update existing D3 elements
+      // Add a tooltip div. Here I define the general feature of the tooltip: stuff that do not depend on the data point.
+      // Its opacity is set to 0: we don't see it by default.
+      // const tooltip = d3
+      //   .select('.tooltip-area')
+      //   .append('div')
+      //   .style('opacity', 0)
+      //   .attr('class', 'tooltip')
+      //   .style('background-color', 'white')
+      //   .style('border', 'solid')
+      //   .style('border-width', '1px')
+      //   .style('border-radius', '5px')
+      //   .style('padding', '10px');
+
+      // A function that change this tooltip when the user hover a point.
+      // Its opacity is set to 1: we can now see it. Plus it set the text and position of tooltip depending on the datapoint (d)
+      // const showTooltip = function (event: any, d: d3.Chord) {
+      //   tooltip
+      //     .style('opacity', 1)
+      //     .html('Source: ' + names[d.source.index] + '<br>Target: ' + names[d.target.index])
+      //     .style('left', event.x / 2 + 300 + 'px')
+      //     .style('top', event.y / 2 + 500 + 'px');
+      // };
+
+      // const hideTooltip = (event: any, d: any) => {
+      //   tooltip.style('opacity', 0);
+      // };
+
       update
         .datum(res)
         .append('g')
@@ -61,11 +103,18 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         })
         .enter()
         .append('path')
-        .attr('d', d3.ribbon<d3.Chord, d3.ChordGroup>().radius(200))
-        .style('fill', '#69b3a2')
-        .style('stroke', 'black');
+        .attr('d', ribbon)
+        .style('fill', function (d) {
+          return colors[d.source.index];
+        })
+        .style('stroke', 'black')
+        .append('title')
+        .text((d) => d3.version);
+      // .text((d) => 'Source: ' + names[d.source.index] + '<br>Target: ' + names[d.target.index]);
+      // .on('mouseover', showTooltip)
+      // .on('mouseleave', hideTooltip);
     }
   });
 
-  return <svg className="d3-component" width={600} height={600} ref={d3Container} />;
+  return <svg className="d3-component" width={660} height={660} ref={d3Container} />;
 };
