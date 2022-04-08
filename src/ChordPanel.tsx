@@ -15,17 +15,38 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         for instance inserting elements into the DOM using D3 */
   useEffect(() => {
     if (data && d3Container.current) {
-      const svg = d3.select(d3Container.current);
+      /* remove added 'g' elements before each draw to remove have multiple
+       rendered graphs while resizing */
+      d3.select('g').remove();
 
-      var margin = { left: 0, top: 5, right: 0, bottom: 5 };
+      var svg = d3.select(d3Container.current);
 
-      // Bind D3 data
-      //   const update = svg.append('g').attr('transform', 'translate(220,220)');
-      const diagram = svg
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom)
+      var margin = { left: 0, top: 0, right: 0, bottom: 0 };
+      var onClick = false;
+      var w = width + margin.left + margin.right;
+      var h = height + margin.top + margin.bottom;
+      var x = width / 2 + margin.left;
+      var y = height / 2 + margin.top;
+
+      var diagram = svg
+        .attr('width', w)
+        .attr('height', h)
         .append('g')
-        .attr('transform', 'translate(' + (width / 2 + margin.left) + ',' + (height / 2 + margin.top) + ')');
+        .attr('transform', 'translate(' + x + ',' + y + ')');
+
+      // create a background rect as click area
+      diagram
+        .append('rect')
+        .attr('width', w)
+        .attr('height', h)
+        .attr('transform', 'translate(' + -x + ',' + -y + ')')
+        .style('opacity', 0)
+        .on('click', function () {
+          if (onClick === true) {
+            ribbons.transition().style('opacity', 0.8);
+            onClick = false;
+          }
+        });
 
       // create input data: a square matrix that provides flow between entities
       const matrix = [
@@ -37,11 +58,10 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
 
       const names = ['podA', 'podB', 'podC', 'podD'];
 
-      // 4 groups, so create a vector of 4 colors
       var colors = ['#440154ff', '#31668dff', '#37b578ff', '#fde725ff'];
 
-      let innerRadius = Math.min(width, height) * 0.5 - 20;
-      let outerRadius = innerRadius + 6;
+      let innerRadius = Math.min(w, h) * 0.5 - 30;
+      let outerRadius = innerRadius + 10;
 
       const chord = d3
         .chordDirected()
@@ -83,6 +103,41 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .enter()
         .append('g')
         .append('path')
+        .on('mouseover', function (event, d) {
+          if (onClick === true) {
+            return;
+          }
+          var i = d.index;
+          ribbons
+            .filter(function (d) {
+              return d.source.index !== i && d.target.index !== i;
+            })
+            .transition()
+            .style('opacity', 0.1);
+        })
+        .on('mouseout', function (event, d) {
+          if (onClick === true) {
+            return;
+          }
+          var i = d.index;
+          ribbons
+            .filter(function (d) {
+              return d.source.index !== i && d.target.index !== i;
+            })
+            .transition()
+            .style('opacity', 0.8);
+        })
+        .on('click', function (event, d) {
+          event.stopPropagation();
+          onClick = true;
+          var i = d.index;
+          ribbons
+            .filter(function (d) {
+              return d.source.index !== i && d.target.index !== i;
+            })
+            .transition()
+            .style('opacity', 0.1);
+        })
         .style('fill', function (d) {
           return colors[d.index];
         })
@@ -111,7 +166,7 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .attr('style', 'black');
 
       // add inner ribbons
-      diagram
+      var ribbons = diagram
         .datum(res)
         .append('g')
         .selectAll('path')
@@ -119,41 +174,41 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           return d;
         })
         .enter()
-        .append('path')
+        .append('path');
+
+      ribbons
         .attr('d', ribbon)
         .attr('stroke', 'black')
+        .style('opacity', 0.8)
         .style('fill', function (d) {
           return colors[d.source.index];
         })
         .on('mouseover', function (event, d) {
-          return (
-            tooltip
-              .style('opacity', 0.9)
-              // .html('Source: ' + names[d.source.index] + '<br>Target: ' + names[d.target.index])
-              .html(
-                `
+          return tooltip
+            .style('opacity', 0.9)
+            .html(
+              `
                         <table style="margin-top: 2.5px;">
                                 <tr><td>From: </td><td style="text-align: right">` +
-                  names[d.source.index] +
-                  `</td></tr>
+                names[d.source.index] +
+                `</td></tr>
                                 <tr><td>To: </td><td style="text-align: right">` +
-                  names[d.target.index] +
-                  `</td></tr>
+                names[d.target.index] +
+                `</td></tr>
                                 <tr><td>NP name: </td><td style="text-align: right">` +
-                  names[d.source.index] +
-                  `</td></tr>
+                names[d.source.index] +
+                `</td></tr>
                                 <tr><td>Rule name: </td><td style="text-align: right">` +
-                  names[d.target.index] +
-                  `</td></tr>
+                names[d.target.index] +
+                `</td></tr>
                                 <tr><td>Bytes: </td><td style="text-align: right">` +
-                  d3.format('.2f')(d.source.index) +
-                  `</td></tr>
+                d3.format('.2f')(d.source.index) +
+                `</td></tr>
                         </table>
                         `
-              )
-              .style('left', event.pageX + 10 + 'px')
-              .style('top', event.pageY - 10 + 'px')
-          );
+            )
+            .style('left', event.pageX + 10 + 'px')
+            .style('top', event.pageY - 10 + 'px');
         })
         .on('mousemove', function (event, d) {
           return tooltip.style('top', event.pageY - 10 + 'px').style('left', event.pageX + 10 + 'px');
@@ -164,5 +219,5 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
     }
   });
 
-  return <svg className="d3-component" width={700} height={700} ref={d3Container} />;
+  return <svg className="d3-component" width={width} height={height} ref={d3Container} />;
 };
