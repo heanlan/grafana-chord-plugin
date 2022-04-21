@@ -28,6 +28,147 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
       var x = width / 2 + margin.left;
       var y = height / 2 + margin.top;
 
+      var records = [];
+      type NetworkPolicy = {
+        egressNP: string;
+        ingressNP: string;
+        egressRuleAction: number;
+        ingressRuleAction: number;
+        bytes: number;
+        reverseBytes: number;
+      };
+      var npMap: Map<string, NetworkPolicy> = new Map();
+
+      var ruleActionMap: Map<number, string> = new Map([
+        [1, 'Allow'],
+        [2, 'Drop'],
+        [3, 'Reject'],
+      ]);
+
+      let sourcePods = data.series
+        .map((series) => series.fields.find((field) => field.name === 'src'))
+        .map((field) => {
+          let record = field?.values as any;
+          return record?.buffer;
+        })[0];
+      if (sourcePods !== undefined) {
+        let destinationSvcs = data.series
+          .map((series) => series.fields.find((field) => field.name === 'dstSvc'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let destinationPods = data.series
+          .map((series) => series.fields.find((field) => field.name === 'dst'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let destinationIPs = data.series
+          .map((series) => series.fields.find((field) => field.name === 'dstIP'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let bytes = data.series
+          .map((series) => series.fields.find((field) => field.name === 'bytes'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let reverseBytes = data.series
+          .map((series) => series.fields.find((field) => field.name === 'revBytes'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let egressNPs = data.series
+          .map((series) => series.fields.find((field) => field.name === 'egressNetworkPolicyName'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let egressRuleActions = data.series
+          .map((series) => series.fields.find((field) => field.name === 'egressNetworkPolicyRuleAction'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let ingressNPs = data.series
+          .map((series) => series.fields.find((field) => field.name === 'ingressNetworkPolicyName'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let ingressRuleActions = data.series
+          .map((series) => series.fields.find((field) => field.name === 'ingressNetworkPolicyRuleAction'))
+          .map((field) => {
+            let record = field?.values as any;
+            return record?.buffer;
+          })[0];
+        let n = sourcePods.length;
+        for (let i = 0; i < n; i++) {
+          let record = [];
+          let source = sourcePods[i];
+          let destination = destinationSvcs[i];
+          if (source === '') {
+            source = 'N/A';
+          }
+          if (destination === ':0') {
+            if (destinationPods[i] === '/:0') {
+              if (destinationIPs === '') {
+                destination = 'N/A';
+              } else {
+                destination = destinationIPs[i];
+              }
+            } else {
+              destination = destinationPods[i];
+            }
+          }
+          record.push(source);
+          record.push(destination);
+          record.push(bytes[i]);
+          record.push(reverseBytes[i]);
+          record.push(egressNPs[i]);
+          record.push(egressRuleActions[i]);
+          record.push(ingressNPs[i]);
+          record.push(ingressRuleActions[i]);
+          records.push(record);
+        }
+        console.log(records);
+      }
+      const names = Array.from(new Set(records.flatMap((d) => [d[0], d[1]])));
+      var color = d3.scaleOrdinal(d3.schemeTableau10);
+      const index = new Map(names.map((name: string, i) => [name, i]));
+      // used to store bytes of each connection
+      const matrix = Array.from(index, () => new Array(names.length).fill(0));
+      for (var record of records) {
+        var source: string = record[0];
+        var target: string = record[1];
+        var byte: number = record[2];
+        var reverseByte: number = record[3];
+        var egressNP: string = record[4];
+        var egressRuleAction: number = record[5];
+        var ingressNP: string = record[6];
+        var ingressRuleAction: number = record[7];
+        matrix[index.get(source)!][index.get(target)!] += byte;
+        const idxStr: string = [index.get(source)!, index.get(target)!].join(','); // key
+        const np: NetworkPolicy = {
+          egressNP: egressNP,
+          egressRuleAction: egressRuleAction,
+          ingressNP: ingressNP,
+          ingressRuleAction: ingressRuleAction,
+          bytes: byte,
+          reverseBytes: reverseByte,
+        }; // value
+        npMap.set(idxStr, np);
+      }
+
+      const redColor = '#FF0000';
+
+      let innerRadius = Math.min(w, h) * 0.5 - 30;
+      let outerRadius = innerRadius + 10;
+
       var diagram = svg
         .attr('width', w)
         .attr('height', h)
@@ -47,21 +188,6 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
             onClick = false;
           }
         });
-
-      // create input data: a square matrix that provides flow between entities
-      const matrix = [
-        [0, 5871, 8916, 2868],
-        [1951, 0, 2060, 6171],
-        [8010, 16145, 0, 8045],
-        [1013, 990, 940, 0],
-      ];
-
-      const names = ['podA', 'podB', 'podC', 'podD'];
-
-      var colors = ['#440154ff', '#31668dff', '#37b578ff', '#fde725ff'];
-
-      let innerRadius = Math.min(w, h) * 0.5 - 30;
-      let outerRadius = innerRadius + 10;
 
       const chord = d3
         .chordDirected()
@@ -139,7 +265,7 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
             .style('opacity', 0.1);
         })
         .style('fill', function (d) {
-          return colors[d.index];
+          return color(names[d.index]);
         })
         .style('stroke', 'black')
         .attr('id', function (d, i) {
@@ -180,29 +306,47 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .attr('d', ribbon)
         .attr('stroke', 'black')
         .style('opacity', 0.8)
+        // customize ribbon color, deny -> red, others -> source group color
         .style('fill', function (d) {
-          return colors[d.source.index];
+          const idxStr = [d.source.index, d.target.index].join(',');
+          const egressRuleAction = npMap.get(idxStr)?.egressRuleAction;
+          const ingressRuleAction = npMap.get(idxStr)?.ingressRuleAction;
+          if (egressRuleAction === 2 || egressRuleAction === 3 || ingressRuleAction === 2 || ingressRuleAction === 3) {
+            return redColor;
+          }
+          return color(names[d.source.index]);
         })
         .on('mouseover', function (event, d) {
+          const idxStr = [d.source.index, d.target.index].join(',');
+          const np = npMap.get(idxStr)!;
           return tooltip
             .style('opacity', 0.9)
             .html(
               `
                         <table style="margin-top: 2.5px;">
-                                <tr><td>From: </td><td style="text-align: right">` +
+                <tr><td>From: </td><td style="text-align: right">` +
                 names[d.source.index] +
                 `</td></tr>
-                                <tr><td>To: </td><td style="text-align: right">` +
+                <tr><td>To: </td><td style="text-align: right">` +
                 names[d.target.index] +
                 `</td></tr>
-                                <tr><td>NP name: </td><td style="text-align: right">` +
-                names[d.source.index] +
+                <tr><td>Egress NetworkPolicy name: </td><td style="text-align: right">` +
+                np.egressNP +
                 `</td></tr>
-                                <tr><td>Rule name: </td><td style="text-align: right">` +
-                names[d.target.index] +
+                <tr><td>Egress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
+                ruleActionMap.get(np.egressRuleAction) +
                 `</td></tr>
-                                <tr><td>Bytes: </td><td style="text-align: right">` +
-                d3.format('.2f')(d.source.index) +
+                <tr><td>Ingress NetworkPolicy name: </td><td style="text-align: right">` +
+                np.ingressNP +
+                `</td></tr>
+                <tr><td>Ingress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
+                ruleActionMap.get(np.ingressRuleAction) +
+                `</td></tr>
+                <tr><td>Bytes: </td><td style="text-align: right">` +
+                np.bytes +
+                `</td></tr>
+                <tr><td>Reverse Bytes: </td><td style="text-align: right">` +
+                np.reverseBytes +
                 `</td></tr>
                         </table>
                         `
