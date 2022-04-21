@@ -166,7 +166,7 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
 
       const redColor = '#FF0000';
 
-      let innerRadius = Math.min(w, h) * 0.5 - 30;
+      let innerRadius = Math.min(w, h) * 0.5 - 100;
       let outerRadius = innerRadius + 10;
 
       var diagram = svg
@@ -219,7 +219,7 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .style('padding', '5px');
 
       // add outer arcs
-      diagram
+      const arcs = diagram
         .datum(res)
         .append('g')
         .selectAll('g')
@@ -227,7 +227,9 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           return d.groups;
         })
         .enter()
-        .append('g')
+        .append('g');
+
+      arcs
         .append('path')
         .on('mouseover', function (event, d) {
           if (onClick === true) {
@@ -274,21 +276,82 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .attr('d', arc);
 
       // add labels to arcs/groups
+      // diagram
+      //   .append('g')
+      //   .selectAll('text')
+      //   .data(res.groups)
+      //   .enter()
+      //   .append('text')
+      //   .attr('x', 6)
+      //   .attr('dy', -5)
+      //   .append('textPath')
+      //   .attr('xlink:href', function (d) {
+      //     return '#group' + d.index;
+      //   })
+      //   .text(function (chords, i) {
+      //     return names[i];
+      //   })
+      //   .attr('style', 'black');
+
       diagram
         .append('g')
         .selectAll('text')
         .data(res.groups)
         .enter()
         .append('text')
-        .attr('x', 6)
-        .attr('dy', -5)
-        .append('textPath')
-        .attr('xlink:href', function (d) {
-          return '#group' + d.index;
+        .each(function (d: any) {
+          d.angle = (d.startAngle + d.endAngle) / 2;
         })
+        .attr('dy', '.35em')
+        .attr('class', 'titles')
+        .attr('text-anchor', function (d: any) {
+          return d.angle > Math.PI ? 'end' : null;
+        })
+        .attr('transform', function (d: any) {
+          return (
+            'rotate(' +
+            ((d.angle * 180) / Math.PI - 90) +
+            ')' +
+            'translate(' +
+            (innerRadius + 15) +
+            ')' +
+            (d.angle > Math.PI ? 'rotate(180)' : '')
+          );
+        })
+        .attr('opacity', 0.9)
+        .append('tspan')
+        .attr('x', 0)
+        .attr('dy', 0)
         .text(function (chords, i) {
-          return names[i];
+          var s = names[i].split('/').join(',').split(':').join(',').split(',');
+          if (s[0] !== undefined) {
+            return s[0];
+          } else {
+            return '';
+          }
         })
+        .append('tspan')
+        .attr('x', 0)
+        .attr('dy', 15)
+        .text(function (chords, i) {
+          var s = names[i].split('/').join(',').split(':').join(',').split(',');
+          if (s[1] !== undefined) {
+            return s[1];
+          } else {
+            return '';
+          }
+        })
+        // .append('tspan')
+        // .attr('x', 0)
+        // .attr('dy', 15)
+        // .text(function (chords, i) {
+        //   var s = names[i].split('/').join(',').split(':').join(',').split(',');
+        //   if (s[2] !== undefined) {
+        //     return s[2];
+        //   } else {
+        //     return '';
+        //   }
+        // })
         .attr('style', 'black');
 
       // add inner ribbons
