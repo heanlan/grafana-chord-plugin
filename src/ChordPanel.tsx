@@ -164,7 +164,8 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         npMap.set(idxStr, np);
       }
 
-      const redColor = '#FF0000';
+      const denyColor = '#FF5733',
+        allowColor = '#50C878';
 
       let innerRadius = Math.min(w, h) * 0.5 - 100;
       let outerRadius = innerRadius + 10;
@@ -275,24 +276,7 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         })
         .attr('d', arc);
 
-      // add labels to arcs/groups
-      // diagram
-      //   .append('g')
-      //   .selectAll('text')
-      //   .data(res.groups)
-      //   .enter()
-      //   .append('text')
-      //   .attr('x', 6)
-      //   .attr('dy', -5)
-      //   .append('textPath')
-      //   .attr('xlink:href', function (d) {
-      //     return '#group' + d.index;
-      //   })
-      //   .text(function (chords, i) {
-      //     return names[i];
-      //   })
-      //   .attr('style', 'black');
-
+      // add labels to arcs
       diagram
         .append('g')
         .selectAll('text')
@@ -341,17 +325,6 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
             return '';
           }
         })
-        // .append('tspan')
-        // .attr('x', 0)
-        // .attr('dy', 15)
-        // .text(function (chords, i) {
-        //   var s = names[i].split('/').join(',').split(':').join(',').split(',');
-        //   if (s[2] !== undefined) {
-        //     return s[2];
-        //   } else {
-        //     return '';
-        //   }
-        // })
         .attr('style', 'black');
 
       // add inner ribbons
@@ -369,51 +342,60 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .attr('d', ribbon)
         .attr('stroke', 'black')
         .style('opacity', 0.8)
-        // customize ribbon color, deny -> red, others -> source group color
+        // customize ribbon color, deny -> red, allow -> green, others -> source group color
         .style('fill', function (d) {
           const idxStr = [d.source.index, d.target.index].join(',');
           const egressRuleAction = npMap.get(idxStr)?.egressRuleAction;
           const ingressRuleAction = npMap.get(idxStr)?.ingressRuleAction;
           if (egressRuleAction === 2 || egressRuleAction === 3 || ingressRuleAction === 2 || ingressRuleAction === 3) {
-            return redColor;
+            return denyColor;
+          }
+          if (egressRuleAction === 1 || ingressRuleAction === 1) {
+            return allowColor;
           }
           return color(names[d.source.index]);
         })
         .on('mouseover', function (event, d) {
           const idxStr = [d.source.index, d.target.index].join(',');
           const np = npMap.get(idxStr)!;
+          var texts =
+            `
+          <table style="margin-top: 2.5px;">
+          <tr><td>From: </td><td style="text-align: right">` +
+            names[d.source.index] +
+            `</td></tr><tr><td>To: </td><td style="text-align: right">` +
+            names[d.target.index];
+          if (np.egressNP !== '') {
+            texts +=
+              `</td></tr>
+            <tr><td>Egress NetworkPolicy name: </td><td style="text-align: right">` +
+              np.egressNP +
+              `</td></tr>
+            <tr><td>Egress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
+              ruleActionMap.get(np.egressRuleAction);
+          }
+          if (np.ingressNP !== '') {
+            texts +=
+              `</td></tr>
+            <tr><td>Ingress NetworkPolicy name: </td><td style="text-align: right">` +
+              np.ingressNP +
+              `</td></tr>
+            <tr><td>Ingress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
+              ruleActionMap.get(np.ingressRuleAction);
+          }
+          texts +=
+            `</td></tr>
+          <tr><td>Bytes: </td><td style="text-align: right">` +
+            np.bytes +
+            `</td></tr>
+          <tr><td>Reverse Bytes: </td><td style="text-align: right">` +
+            np.reverseBytes +
+            `</td></tr>
+                  </table>
+                  `;
           return tooltip
             .style('opacity', 0.9)
-            .html(
-              `
-                        <table style="margin-top: 2.5px;">
-                <tr><td>From: </td><td style="text-align: right">` +
-                names[d.source.index] +
-                `</td></tr>
-                <tr><td>To: </td><td style="text-align: right">` +
-                names[d.target.index] +
-                `</td></tr>
-                <tr><td>Egress NetworkPolicy name: </td><td style="text-align: right">` +
-                np.egressNP +
-                `</td></tr>
-                <tr><td>Egress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
-                ruleActionMap.get(np.egressRuleAction) +
-                `</td></tr>
-                <tr><td>Ingress NetworkPolicy name: </td><td style="text-align: right">` +
-                np.ingressNP +
-                `</td></tr>
-                <tr><td>Ingress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
-                ruleActionMap.get(np.ingressRuleAction) +
-                `</td></tr>
-                <tr><td>Bytes: </td><td style="text-align: right">` +
-                np.bytes +
-                `</td></tr>
-                <tr><td>Reverse Bytes: </td><td style="text-align: right">` +
-                np.reverseBytes +
-                `</td></tr>
-                        </table>
-                        `
-            )
+            .html(texts)
             .style('left', event.pageX + 10 + 'px')
             .style('top', event.pageY - 10 + 'px');
         })
