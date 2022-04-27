@@ -1,15 +1,25 @@
 import React, { useRef, useEffect } from 'react';
-import { PanelProps } from '@grafana/data';
+import { DataFrame, PanelProps } from '@grafana/data';
+import { withTheme2, Themeable2 } from '@grafana/ui';
 import { ChordOptions } from 'types';
 import * as d3 from 'my-d3';
 
-interface Props extends PanelProps<ChordOptions> {}
+interface Props extends Themeable2, PanelProps<ChordOptions> {}
 
-export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) => {
+const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, theme }) => {
   /* The useRef Hook creates a variable that "holds on" to a value across rendering
       passes. In this case it will hold our component's SVG DOM element. It's
       initialized null and React will assign it later (see the return statement) */
   const d3Container = useRef(null);
+
+  function GetFieldVal(fieldName: string) {
+    return data.series
+      .map((series: DataFrame) => series.fields.find((field: any) => field.name === fieldName))
+      .map((field: any) => {
+        let record = field?.values as any;
+        return record?.buffer;
+      })[0];
+  }
 
   /* The useEffect Hook is for running side effects outside of React,
         for instance inserting elements into the DOM using D3 */
@@ -28,105 +38,51 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
       var x = width / 2 + margin.left;
       var y = height / 2 + margin.top;
 
+      // step-1: process data
+
       var records = [];
-      type NetworkPolicy = {
-        egressNP: string;
-        ingressNP: string;
-        egressRuleAction: number;
-        ingressRuleAction: number;
-        bytes: number;
-        reverseBytes: number;
-      };
-      var npMap: Map<string, NetworkPolicy> = new Map();
-
-      var ruleActionMap: Map<number, string> = new Map([
-        [1, 'Allow'],
-        [2, 'Drop'],
-        [3, 'Reject'],
-      ]);
-
-      let sourcePods = data.series
-        .map((series) => series.fields.find((field) => field.name === 'src'))
-        .map((field) => {
-          let record = field?.values as any;
-          return record?.buffer;
-        })[0];
+      let sourcePods = GetFieldVal('srcPod');
       if (sourcePods !== undefined) {
-        let destinationSvcs = data.series
-          .map((series) => series.fields.find((field) => field.name === 'dstSvc'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let destinationPods = data.series
-          .map((series) => series.fields.find((field) => field.name === 'dst'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let destinationIPs = data.series
-          .map((series) => series.fields.find((field) => field.name === 'dstIP'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let bytes = data.series
-          .map((series) => series.fields.find((field) => field.name === 'bytes'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let reverseBytes = data.series
-          .map((series) => series.fields.find((field) => field.name === 'revBytes'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let egressNPs = data.series
-          .map((series) => series.fields.find((field) => field.name === 'egressNetworkPolicyName'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let egressRuleActions = data.series
-          .map((series) => series.fields.find((field) => field.name === 'egressNetworkPolicyRuleAction'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let ingressNPs = data.series
-          .map((series) => series.fields.find((field) => field.name === 'ingressNetworkPolicyName'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
-        let ingressRuleActions = data.series
-          .map((series) => series.fields.find((field) => field.name === 'ingressNetworkPolicyRuleAction'))
-          .map((field) => {
-            let record = field?.values as any;
-            return record?.buffer;
-          })[0];
+        let sourcePorts = GetFieldVal('srcPort');
+        let destinationSvcs = GetFieldVal('dstSvc');
+        let destinationSvcPorts = GetFieldVal('dstSvcPort');
+        let destinationPods = GetFieldVal('dstPod');
+        let destinationPorts = GetFieldVal('dstPort');
+        let destinationIPs = GetFieldVal('dstIP');
+        let bytes = GetFieldVal('bytes');
+        let reverseBytes = GetFieldVal('revBytes');
+        let egressNPs = GetFieldVal('egressNetworkPolicyName');
+        let egressRuleActions = GetFieldVal('egressNetworkPolicyRuleAction');
+        let ingressNPs = GetFieldVal('ingressNetworkPolicyName');
+        let ingressRuleActions = GetFieldVal('ingressNetworkPolicyRuleAction');
         let n = sourcePods.length;
         for (let i = 0; i < n; i++) {
           let record = [];
           let source = sourcePods[i];
+          let sourcePort = sourcePorts[i];
           let destination = destinationSvcs[i];
+          let destinationPort = destinationSvcPorts[i];
           if (source === '') {
             source = 'N/A';
+            sourcePort = 0;
           }
-          if (destination === ':0') {
-            if (destinationPods[i] === '/:0') {
+          if (destination === '') {
+            if (destinationPods[i] === '/') {
               if (destinationIPs === '') {
                 destination = 'N/A';
               } else {
                 destination = destinationIPs[i];
+                destinationPort = 0;
               }
             } else {
               destination = destinationPods[i];
+              destinationPort = destinationPorts[i];
             }
           }
           record.push(source);
+          record.push(sourcePort);
           record.push(destination);
+          record.push(destinationPort);
           record.push(bytes[i]);
           record.push(reverseBytes[i]);
           record.push(egressNPs[i]);
@@ -135,25 +91,52 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           record.push(ingressRuleActions[i]);
           records.push(record);
         }
-        console.log(records);
       }
-      const names = Array.from(new Set(records.flatMap((d) => [d[0], d[1]])));
-      var color = d3.scaleOrdinal(d3.schemeTableau10);
+
+      const names = Array.from(new Set(records.flatMap((d) => [d[0], d[2]])));
+      const color = d3.scaleOrdinal(d3.schemeTableau10);
       const index = new Map(names.map((name: string, i) => [name, i]));
       // used to store bytes of each connection
       const matrix = Array.from(index, () => new Array(names.length).fill(0));
+      type Connection = {
+        source: string;
+        sourcePort: number;
+        destination: string;
+        destinationPort: number;
+        egressNP: string;
+        ingressNP: string;
+        egressRuleAction: number;
+        ingressRuleAction: number;
+        bytes: number;
+        reverseBytes: number;
+      };
+      var connMap: Map<string, Connection> = new Map();
+      var ruleActionMap: Map<number, string> = new Map([
+        [1, 'Allow'],
+        [2, 'Drop'],
+        [3, 'Reject'],
+      ]);
+
       for (var record of records) {
         var source: string = record[0];
-        var target: string = record[1];
-        var byte: number = record[2];
-        var reverseByte: number = record[3];
-        var egressNP: string = record[4];
-        var egressRuleAction: number = record[5];
-        var ingressNP: string = record[6];
-        var ingressRuleAction: number = record[7];
-        matrix[index.get(source)!][index.get(target)!] += byte;
-        const idxStr: string = [index.get(source)!, index.get(target)!].join(','); // key
-        const np: NetworkPolicy = {
+        var sourcePort: number = record[1];
+        var destination: string = record[2];
+        var destiantionPort: number = record[3];
+        var byte: number = record[4];
+        var reverseByte: number = record[5];
+        var egressNP: string = record[6];
+        var egressRuleAction: number = record[7];
+        var ingressNP: string = record[8];
+        var ingressRuleAction: number = record[9];
+        // enter connection entry into chord matrix
+        matrix[index.get(source)!][index.get(destination)!] += byte;
+        // enter connection entry into npMap
+        const idxStr: string = [index.get(source)!, index.get(destination)!].join(','); // key
+        const conn: Connection = {
+          source: source,
+          sourcePort: sourcePort,
+          destination: destination,
+          destinationPort: destiantionPort,
           egressNP: egressNP,
           egressRuleAction: egressRuleAction,
           ingressNP: ingressNP,
@@ -161,14 +144,37 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           bytes: byte,
           reverseBytes: reverseByte,
         }; // value
-        npMap.set(idxStr, np);
+        connMap.set(idxStr, conn);
       }
 
-      const denyColor = '#FF5733',
-        allowColor = '#50C878';
+      // step-2: draw chord diagram
 
-      let innerRadius = Math.min(w, h) * 0.5 - 100;
-      let outerRadius = innerRadius + 10;
+      const denyColor = '#FF0000';
+      const allowColor = '#00FF00';
+      const innerRadius = Math.min(w, h) * 0.5 - 100;
+      const outerRadius = innerRadius + 10;
+      const chord = d3
+        .chordDirected()
+        .padAngle(10 / innerRadius)
+        .sortSubgroups(d3.descending)
+        .sortChords(d3.descending);
+      const arc = d3.arc<d3.ChordGroup>().innerRadius(innerRadius).outerRadius(outerRadius);
+      const ribbon = d3
+        .ribbonArrow<d3.Chord, d3.ChordSubgroup>()
+        .radius(innerRadius - 1)
+        .padAngle(1 / innerRadius);
+      const tooltip = d3
+        .select('body')
+        .append('div')
+        .attr('class', 'tooltip')
+        .style('opacity', 0)
+        .style('position', 'absolute')
+        .style('z-index', '10')
+        .style('background-color', theme.colors.background.secondary)
+        .style('border', 'solid')
+        .style('border-width', '2px')
+        .style('border-radius', '5px')
+        .style('padding', '5px');
 
       var diagram = svg
         .attr('width', w)
@@ -190,37 +196,12 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           }
         });
 
-      const chord = d3
-        .chordDirected()
-        .padAngle(10 / innerRadius)
-        .sortSubgroups(d3.descending)
-        .sortChords(d3.descending);
-
-      const arc = d3.arc<d3.ChordGroup>().innerRadius(innerRadius).outerRadius(outerRadius);
-
-      const ribbon = d3
-        .ribbonArrow<d3.Chord, d3.ChordSubgroup>()
-        .radius(innerRadius - 1)
-        .padAngle(1 / innerRadius);
-
-      // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
+      // give the data matrix to d3.chord(): it will calculates all the info we
+      // need to draw arc and ribbon
       var res = chord(matrix);
 
-      var tooltip = d3
-        .select('body')
-        .append('div')
-        .attr('class', 'tooltip')
-        .style('opacity', 0)
-        .style('position', 'absolute')
-        .style('z-index', '10')
-        .style('background-color', 'white')
-        .style('border', 'solid')
-        .style('border-width', '2px')
-        .style('border-radius', '5px')
-        .style('padding', '5px');
-
       // add outer arcs
-      const arcs = diagram
+      var arcs = diagram
         .datum(res)
         .append('g')
         .selectAll('g')
@@ -276,8 +257,8 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         })
         .attr('d', arc);
 
-      // add labels to arcs
-      diagram
+      // add text labels to arcs
+      var labels = diagram
         .append('g')
         .selectAll('text')
         .data(res.groups)
@@ -302,30 +283,37 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
             (d.angle > Math.PI ? 'rotate(180)' : '')
           );
         })
-        .attr('opacity', 0.9)
+        .attr('opacity', 0.9);
+
+      labels
         .append('tspan')
+        .style('fill', theme.colors.text.primary)
         .attr('x', 0)
         .attr('dy', 0)
         .text(function (chords, i) {
-          var s = names[i].split('/').join(',').split(':').join(',').split(',');
+          console.log(names[i]);
+          console.log(names[i].split('/'));
+          let s = names[i].split('/');
           if (s[0] !== undefined) {
             return s[0];
           } else {
             return '';
           }
-        })
+        });
+
+      labels
         .append('tspan')
+        .style('fill', theme.colors.text.primary)
         .attr('x', 0)
         .attr('dy', 15)
         .text(function (chords, i) {
-          var s = names[i].split('/').join(',').split(':').join(',').split(',');
+          var s = names[i].split('/');
           if (s[1] !== undefined) {
             return s[1];
           } else {
             return '';
           }
-        })
-        .attr('style', 'black');
+        });
 
       // add inner ribbons
       var ribbons = diagram
@@ -342,11 +330,11 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
         .attr('d', ribbon)
         .attr('stroke', 'black')
         .style('opacity', 0.8)
-        // customize ribbon color, deny -> red, allow -> green, others -> source group color
+        // set ribbon color, deny -> red, allow -> green, others -> source group color
         .style('fill', function (d) {
           const idxStr = [d.source.index, d.target.index].join(',');
-          const egressRuleAction = npMap.get(idxStr)?.egressRuleAction;
-          const ingressRuleAction = npMap.get(idxStr)?.ingressRuleAction;
+          const egressRuleAction = connMap.get(idxStr)?.egressRuleAction;
+          const ingressRuleAction = connMap.get(idxStr)?.ingressRuleAction;
           if (egressRuleAction === 2 || egressRuleAction === 3 || ingressRuleAction === 2 || ingressRuleAction === 3) {
             return denyColor;
           }
@@ -355,46 +343,56 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
           }
           return color(names[d.source.index]);
         })
+        // add tooltips to ribbons on mouseover event
         .on('mouseover', function (event, d) {
           const idxStr = [d.source.index, d.target.index].join(',');
-          const np = npMap.get(idxStr)!;
+          const conn = connMap.get(idxStr)!;
+          var destination = conn.destination;
+          if (conn.destinationPort !== 0) {
+            destination += `:` + conn.destinationPort;
+          }
           var texts =
             `
           <table style="margin-top: 2.5px;">
           <tr><td>From: </td><td style="text-align: right">` +
-            names[d.source.index] +
+            conn.source +
+            `:` +
+            conn.sourcePort +
             `</td></tr><tr><td>To: </td><td style="text-align: right">` +
-            names[d.target.index];
-          if (np.egressNP !== '') {
+            destination;
+          // add egressNetworkPolicy metadata
+          if (conn.egressNP !== '') {
             texts +=
               `</td></tr>
             <tr><td>Egress NetworkPolicy name: </td><td style="text-align: right">` +
-              np.egressNP +
+              conn.egressNP +
               `</td></tr>
             <tr><td>Egress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
-              ruleActionMap.get(np.egressRuleAction);
+              ruleActionMap.get(conn.egressRuleAction);
           }
-          if (np.ingressNP !== '') {
+          // add ingressNetworkPolicy metadata
+          if (conn.ingressNP !== '') {
             texts +=
               `</td></tr>
             <tr><td>Ingress NetworkPolicy name: </td><td style="text-align: right">` +
-              np.ingressNP +
+              conn.ingressNP +
               `</td></tr>
             <tr><td>Ingress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
-              ruleActionMap.get(np.ingressRuleAction);
+              ruleActionMap.get(conn.ingressRuleAction);
           }
+          // add bytes and reverseBytes
           texts +=
             `</td></tr>
           <tr><td>Bytes: </td><td style="text-align: right">` +
-            np.bytes +
+            conn.bytes +
             `</td></tr>
           <tr><td>Reverse Bytes: </td><td style="text-align: right">` +
-            np.reverseBytes +
+            conn.reverseBytes +
             `</td></tr>
                   </table>
                   `;
           return tooltip
-            .style('opacity', 0.9)
+            .style('opacity', 1)
             .html(texts)
             .style('left', event.pageX + 10 + 'px')
             .style('top', event.pageY - 10 + 'px');
@@ -410,3 +408,5 @@ export const ChordPanel: React.FC<Props> = ({ options, data, width, height }) =>
 
   return <svg className="d3-component" width={width} height={height} ref={d3Container} />;
 };
+
+export const ChordPanel = withTheme2(UnthemedChordPanel);
