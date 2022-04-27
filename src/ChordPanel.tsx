@@ -28,6 +28,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
       /* remove added 'g' elements before each draw to remove have multiple
        rendered graphs while resizing */
       d3.select('g').remove();
+      d3.selectAll('.tooltip').remove();
 
       var svg = d3.select(d3Container.current);
 
