@@ -7,11 +7,9 @@ import * as d3 from 'my-d3';
 interface Props extends Themeable2, PanelProps<ChordOptions> {}
 
 const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, theme }) => {
-  /* The useRef Hook creates a variable that "holds on" to a value across rendering
-      passes. In this case it will hold our component's SVG DOM element. It's
-      initialized null and React will assign it later (see the return statement) */
   const d3Container = useRef(null);
 
+  // GetFieldVal reads field's value from data series
   function GetFieldVal(fieldName: string) {
     return data.series
       .map((series: DataFrame) => series.fields.find((field: any) => field.name === fieldName))
@@ -21,27 +19,25 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
       })[0];
   }
 
-  /* The useEffect Hook is for running side effects outside of React,
-        for instance inserting elements into the DOM using D3 */
   useEffect(() => {
     if (data && d3Container.current) {
-      /* remove added 'g' elements before each draw to remove have multiple
-       rendered graphs while resizing */
+      // Remove added 'g' and '.tooltip' elements before each draw to remove
+      // have multiple rendered graphs while resizing
       d3.select('g').remove();
       d3.selectAll('.tooltip').remove();
 
-      var svg = d3.select(d3Container.current);
+      const svg = d3.select(d3Container.current);
 
-      var margin = { left: 0, top: 0, right: 0, bottom: 0 };
-      var onClick = false;
-      var w = width + margin.left + margin.right;
-      var h = height + margin.top + margin.bottom;
-      var x = width / 2 + margin.left;
-      var y = height / 2 + margin.top;
+      const margin = { left: 0, top: 0, right: 0, bottom: 0 };
+      let onClick = false;
+      const w = width + margin.left + margin.right;
+      const h = height + margin.top + margin.bottom;
+      const x = width / 2 + margin.left;
+      const y = height / 2 + margin.top;
 
       // step-1: process data
 
-      var records = [];
+      let records = [];
       let sourcePods = GetFieldVal('srcPod');
       if (sourcePods !== undefined) {
         let sourcePorts = GetFieldVal('srcPort');
@@ -95,9 +91,9 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
       }
 
       const names = Array.from(new Set(records.flatMap((d) => [d[0], d[2]])));
-      const color = d3.scaleOrdinal(d3.schemeTableau10);
+      const color = d3.scaleOrdinal(d3.schemeSet3);
       const index = new Map(names.map((name: string, i) => [name, i]));
-      // used to store bytes of each connection
+      // Used to store byte counts of each connection
       const matrix = Array.from(index, () => new Array(names.length).fill(0));
       type Connection = {
         source: string;
@@ -111,29 +107,32 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
         bytes: number;
         reverseBytes: number;
       };
-      var connMap: Map<string, Connection> = new Map();
-      var ruleActionMap: Map<number, string> = new Map([
+      // Used to store metadata of each connection
+      const connMap: Map<string, Connection> = new Map();
+      const ruleActionMap: Map<number, string> = new Map([
         [1, 'Allow'],
         [2, 'Drop'],
         [3, 'Reject'],
       ]);
 
-      for (var record of records) {
-        var source: string = record[0];
-        var sourcePort: number = record[1];
-        var destination: string = record[2];
-        var destiantionPort: number = record[3];
-        var byte: number = record[4];
-        var reverseByte: number = record[5];
-        var egressNP: string = record[6];
-        var egressRuleAction: number = record[7];
-        var ingressNP: string = record[8];
-        var ingressRuleAction: number = record[9];
-        // enter connection entry into chord matrix
+      for (let record of records) {
+        let source: string = record[0];
+        let sourcePort: number = record[1];
+        let destination: string = record[2];
+        let destiantionPort: number = record[3];
+        let byte: number = record[4];
+        let reverseByte: number = record[5];
+        let egressNP: string = record[6];
+        let egressRuleAction: number = record[7];
+        let ingressNP: string = record[8];
+        let ingressRuleAction: number = record[9];
+        // Enter connection entry into chord matrix
         matrix[index.get(source)!][index.get(destination)!] += byte;
-        // enter connection entry into npMap
-        const idxStr: string = [index.get(source)!, index.get(destination)!].join(','); // key
-        const conn: Connection = {
+        // Enter connection entry into connMap
+        // Enter key
+        let idxStr: string = [index.get(source)!, index.get(destination)!].join(',');
+        // Enter value
+        let conn: Connection = {
           source: source,
           sourcePort: sourcePort,
           destination: destination,
@@ -144,14 +143,14 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           ingressRuleAction: ingressRuleAction,
           bytes: byte,
           reverseBytes: reverseByte,
-        }; // value
+        };
         connMap.set(idxStr, conn);
       }
 
       // step-2: draw chord diagram
 
-      const denyColor = '#FF0000';
-      const allowColor = '#00FF00';
+      const denyColor = '#EE4B2B';
+      const allowColor = '#228B22';
       const innerRadius = Math.min(w, h) * 0.5 - 100;
       const outerRadius = innerRadius + 10;
       const chord = d3
@@ -177,13 +176,13 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
         .style('border-radius', '5px')
         .style('padding', '5px');
 
-      var diagram = svg
+      const diagram = svg
         .attr('width', w)
         .attr('height', h)
         .append('g')
         .attr('transform', 'translate(' + x + ',' + y + ')');
 
-      // create a background rect as click area
+      // Create a transparent background rect as a click area
       diagram
         .append('rect')
         .attr('width', w)
@@ -197,12 +196,12 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           }
         });
 
-      // give the data matrix to d3.chord(): it will calculates all the info we
-      // need to draw arc and ribbon
-      var res = chord(matrix);
+      // Give the data matrix to d3.chord(): it will calculates all the info we
+      // need to draw arcs and ribbons
+      const res = chord(matrix);
 
-      // add outer arcs
-      var arcs = diagram
+      // Add outer arcs
+      const arcs = diagram
         .datum(res)
         .append('g')
         .selectAll('g')
@@ -214,11 +213,11 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
 
       arcs
         .append('path')
-        .on('mouseover', function (event, d) {
+        .on('mouseover', function (d) {
           if (onClick === true) {
             return;
           }
-          var i = d.index;
+          let i = d.index;
           ribbons
             .filter(function (d) {
               return d.source.index !== i && d.target.index !== i;
@@ -226,11 +225,11 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             .transition()
             .style('opacity', 0.1);
         })
-        .on('mouseout', function (event, d) {
+        .on('mouseout', function (d) {
           if (onClick === true) {
             return;
           }
-          var i = d.index;
+          let i = d.index;
           ribbons
             .filter(function (d) {
               return d.source.index !== i && d.target.index !== i;
@@ -241,7 +240,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
         .on('click', function (event, d) {
           event.stopPropagation();
           onClick = true;
-          var i = d.index;
+          let i = d.index;
           ribbons
             .filter(function (d) {
               return d.source.index !== i && d.target.index !== i;
@@ -253,13 +252,13 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           return color(names[d.index]);
         })
         .style('stroke', 'black')
-        .attr('id', function (d, i) {
+        .attr('id', function (d) {
           return 'group' + d.index;
         })
         .attr('d', arc);
 
-      // add text labels to arcs
-      var labels = diagram
+      // Add text labels to arcs
+      const labels = diagram
         .append('g')
         .selectAll('text')
         .data(res.groups)
@@ -269,7 +268,6 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           d.angle = (d.startAngle + d.endAngle) / 2;
         })
         .attr('dy', '.35em')
-        .attr('class', 'titles')
         .attr('text-anchor', function (d: any) {
           return d.angle > Math.PI ? 'end' : null;
         })
@@ -286,14 +284,13 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
         })
         .attr('opacity', 0.9);
 
+      // Add namespace to label
       labels
         .append('tspan')
         .style('fill', theme.colors.text.primary)
         .attr('x', 0)
         .attr('dy', 0)
         .text(function (chords, i) {
-          console.log(names[i]);
-          console.log(names[i].split('/'));
           let s = names[i].split('/');
           if (s[0] !== undefined) {
             return s[0];
@@ -302,13 +299,14 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           }
         });
 
+      // Add Pod/Service name to label
       labels
         .append('tspan')
         .style('fill', theme.colors.text.primary)
         .attr('x', 0)
         .attr('dy', 15)
         .text(function (chords, i) {
-          var s = names[i].split('/');
+          let s = names[i].split('/');
           if (s[1] !== undefined) {
             return s[1];
           } else {
@@ -316,8 +314,8 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           }
         });
 
-      // add inner ribbons
-      var ribbons = diagram
+      // Add inner ribbons
+      const ribbons = diagram
         .datum(res)
         .append('g')
         .selectAll('path')
@@ -328,10 +326,11 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
         .append('path');
 
       ribbons
+        .attr('class', 'ribbons')
         .attr('d', ribbon)
         .attr('stroke', 'black')
         .style('opacity', 0.8)
-        // set ribbon color, deny -> red, allow -> green, others -> source group color
+        // Set ribbon color, deny -> red, allow -> green, others -> source group color
         .style('fill', function (d) {
           const idxStr = [d.source.index, d.target.index].join(',');
           const egressRuleAction = connMap.get(idxStr)?.egressRuleAction;
@@ -344,15 +343,24 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           }
           return color(names[d.source.index]);
         })
-        // add tooltips to ribbons on mouseover event
+        // .attr('stroke-width', function (d) {
+        //   const idxStr = [d.source.index, d.target.index].join(',');
+        //   const egressRuleAction = connMap.get(idxStr)?.egressRuleAction;
+        //   const ingressRuleAction = connMap.get(idxStr)?.ingressRuleAction;
+        //   if (egressRuleAction !== 0 || ingressRuleAction !== 0) {
+        //     return '3';
+        //   }
+        //   return '1';
+        // })
+        // Add tooltips to ribbons on mouseover event
         .on('mouseover', function (event, d) {
           const idxStr = [d.source.index, d.target.index].join(',');
           const conn = connMap.get(idxStr)!;
-          var destination = conn.destination;
+          let destination = conn.destination;
           if (conn.destinationPort !== 0) {
             destination += `:` + conn.destinationPort;
           }
-          var texts =
+          let texts =
             `
           <table style="margin-top: 2.5px;">
           <tr><td>From: </td><td style="text-align: right">` +
@@ -361,7 +369,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             conn.sourcePort +
             `</td></tr><tr><td>To: </td><td style="text-align: right">` +
             destination;
-          // add egressNetworkPolicy metadata
+          // Add egressNetworkPolicy metadata
           if (conn.egressNP !== '') {
             texts +=
               `</td></tr>
@@ -371,7 +379,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             <tr><td>Egress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
               ruleActionMap.get(conn.egressRuleAction);
           }
-          // add ingressNetworkPolicy metadata
+          // Add ingressNetworkPolicy metadata
           if (conn.ingressNP !== '') {
             texts +=
               `</td></tr>
@@ -381,7 +389,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             <tr><td>Ingress NetworkPolicy Rule Action: </td><td style="text-align: right">` +
               ruleActionMap.get(conn.ingressRuleAction);
           }
-          // add bytes and reverseBytes
+          // Add bytes and reverseBytes
           texts +=
             `</td></tr>
           <tr><td>Bytes: </td><td style="text-align: right">` +
