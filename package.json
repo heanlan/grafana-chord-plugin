@@ -1,5 +1,5 @@
 {
-  "name": "antreaflowvisibility-grafana-chord-plugin",
+  "name": "theia-grafana-chord-plugin",
   "version": "1.0.0",
   "description": "",
   "scripts": {
@@ -15,7 +15,7 @@
     "d3-chord": "^3.0.1",
     "my-d3": "npm:d3@7.1.0"
   },
-  "author": "heanlan",
+  "author": "antrea-io",
   "license": "Apache-2.0",
   "devDependencies": {
     "@grafana/data": "latest",

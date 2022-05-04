@@ -59,18 +59,9 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           let sourcePort = sourcePorts[i];
           let destination = destinationSvcs[i];
           let destinationPort = destinationSvcPorts[i];
-          if (source === '') {
-            source = 'N/A';
-            sourcePort = 0;
-          }
           if (destination === '') {
-            if (destinationPods[i] === '/') {
-              if (destinationIPs === '') {
-                destination = 'N/A';
-              } else {
-                destination = destinationIPs[i];
-                destinationPort = 0;
-              }
+            if (destinationPods[i] === '/' || destinationPods[i] === '') {
+              destination = destinationIPs[i];
             } else {
               destination = destinationPods[i];
               destinationPort = destinationPorts[i];
@@ -213,7 +204,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
 
       arcs
         .append('path')
-        .on('mouseover', function (d) {
+        .on('mouseover', function (event, d) {
           if (onClick === true) {
             return;
           }
@@ -225,7 +216,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             .transition()
             .style('opacity', 0.1);
         })
-        .on('mouseout', function (d) {
+        .on('mouseout', function (event, d) {
           if (onClick === true) {
             return;
           }
@@ -343,19 +334,14 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
           }
           return color(names[d.source.index]);
         })
-        // .attr('stroke-width', function (d) {
-        //   const idxStr = [d.source.index, d.target.index].join(',');
-        //   const egressRuleAction = connMap.get(idxStr)?.egressRuleAction;
-        //   const ingressRuleAction = connMap.get(idxStr)?.ingressRuleAction;
-        //   if (egressRuleAction !== 0 || ingressRuleAction !== 0) {
-        //     return '3';
-        //   }
-        //   return '1';
-        // })
         // Add tooltips to ribbons on mouseover event
         .on('mouseover', function (event, d) {
           const idxStr = [d.source.index, d.target.index].join(',');
           const conn = connMap.get(idxStr)!;
+          let source = conn.source;
+          if (conn.sourcePort !== 0) {
+            source += `:` + conn.sourcePort;
+          }
           let destination = conn.destination;
           if (conn.destinationPort !== 0) {
             destination += `:` + conn.destinationPort;
@@ -364,9 +350,7 @@ const UnthemedChordPanel: React.FC<Props> = ({ options, data, width, height, the
             `
           <table style="margin-top: 2.5px;">
           <tr><td>From: </td><td style="text-align: right">` +
-            conn.source +
-            `:` +
-            conn.sourcePort +
+            source +
             `</td></tr><tr><td>To: </td><td style="text-align: right">` +
             destination;
           // Add egressNetworkPolicy metadata

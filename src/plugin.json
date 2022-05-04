@@ -2,17 +2,17 @@
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
   "type": "panel",
   "name": "grafana-chord-plugin",
-  "id": "antreaflowvisibility-grafana-chord-plugin",
+  "id": "theia-grafana-chord-plugin",
   "info": {
     "description": "",
     "author": {
-      "name": "heanlan",
+      "name": "antrea-io",
       "url": ""
     },
     "keywords": [],
     "logos": {
-      "small": "img/logo.svg",
-      "large": "img/logo.svg"
+      "small": "https://raw.githubusercontent.com/antrea-io/antrea/main/docs/assets/logo/antrea_logo_stacked.svg",
+      "large": "https://raw.githubusercontent.com/antrea-io/antrea/main/docs/assets/logo/antrea_logo_stacked.svg"
     },
     "links": [
       {

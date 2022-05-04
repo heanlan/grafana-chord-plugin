@@ -1,20 +1,117 @@
-# Grafana Panel Plugin Template
+# Grafana Chord Panel Plugin
 
-[![Build](https://github.com/grafana/grafana-starter-panel/workflows/CI/badge.svg)](https://github.com/grafana/grafana-starter-panel/actions?query=workflow%3A%22CI%22)
+## What is Grafana Chord Panel Plugin?
 
-This template is a starting point for building Grafana Panel Plugins in Grafana 7.0+
+Grafana Chord Panel Plugin enables users to create Chord Diagram panel in Grafana
+Dashboards. It is used to visualize the network connections. Connections with
+NetworkPolicy enforced will be highlighted. We use green color to highlight "allowed"
+traffic, red color to highlight "denied" traffic. Panels are the building blocks
+of Grafana. They allow you to visualize data in different ways. For more information
+about panels, refer to the documentation on [Panels](https://grafana.com/docs/grafana/latest/features/panels/panels/).
+An example of Chord Panel Plugin:
 
-## What is Grafana Panel Plugin?
+<img src="https://github.com/heanlan/grafana-chord-plugin/releases/download/1.0.0/chord-plugin-sample.png" width="900" alt="Chord Panel Plugin Example">
 
-Panels are the building blocks of Grafana. They allow you to visualize data in different ways. While Grafana has several types of panels already built-in, you can also build your own panel, to add support for other visualizations.
+## Acknowledgements
 
-For more information about panels, refer to the documentation on [Panels](https://grafana.com/docs/grafana/latest/features/panels/panels/)
+The Chord Plugin is created using [D3.js](https://d3js.org/).
 
-## Getting started
+## Data Source
+
+Supported Databases:
+
+- ClickHouse
+
+## Queries Convention
+
+Currently the Chord Plugin is created for restricted uses, only for visualizing
+network flows between the source and destination, with enforced NetworkPolicy
+metadata. To correctly loading data for the Chord Plugin, the query is expected
+to return the following fields, in arbitrary order.
+
+- field 1: value to group by with name or an alias of `srcPod`
+- field 2: value to group by with name or an alias of `srcPort`
+- field 3: value to group by with name or an alias of `dstSvc`
+- field 4: value to group by with name or an alias of `dstSvcPort`
+- field 5: value to group by with name or an alias of `dstPod`
+- field 6: value to group by with name or an alias of `dstPort`
+- field 7: value to group by with name or an alias of `dstIP`
+- field 8: the metric value field with an alias of `bytes`
+- field 9: the metric value field with an alias of `revBytes`
+- field 10: value to group by with name or an alias of `egressNetworkPolicyName`
+- field 11: value to group by with name or an alias of `egressNetworkPolicyRuleAction`
+- field 12: value to group by with name or an alias of `ingressNetworkPolicyName`
+- field 13: value to group by with name or an alias of `ingressNetworkPolicyRuleAction`
+
+Clickhouse query example:
+
+```sql
+SELECT sourcePodName as srcPod,
+destinationPodName as dstPod,
+sourceTransportPort as srcPort,
+destinationTransportPort as dstPort,
+destinationServicePort as dstSvcPort,
+destinationServicePortName as dstSvc,
+destinationIP as dstIP,
+SUM(octetDeltaCount) as bytes,
+SUM(reverseOctetDeltaCount) as revBytes,
+egressNetworkPolicyName,
+egressNetworkPolicyRuleAction,
+ingressNetworkPolicyName,
+ingressNetworkPolicyRuleAction
+from flows
+GROUP BY srcPod, dstPod, srcPort, dstPort, dstSvcPort, dstSvc, dstIP, egressNetworkPolicyName, egressNetworkPolicyRuleAction, ingressNetworkPolicyName, ingressNetworkPolicyRuleAction
+```
+
+## Installation
+
+### 1. Install the Panel
+
+Installing on a local Grafana:
+
+For local instances, plugins are installed and updated via a simple CLI command.
+Use the grafana-cli tool to install sankey-panel-plugin from the commandline:
+
+```shell
+grafana-cli --pluginUrl https://downloads.antrea.io/artifacts/grafana-custom-plugins/grafana-chord-plugin-1.0.0.zip plugins install theia-grafana-sankey-plugin
+```
+
+The plugin will be installed into your grafana plugins directory; the default is
+`/var/lib/grafana/plugins`. More information on the [cli tool](https://grafana.com/docs/grafana/latest/administration/cli/#plugins-commands).
+
+Alternatively, you can manually download the .zip file and unpack it into your grafana
+plugins directory.
+
+[Download](https://downloads.antrea.io/artifacts/grafana-custom-plugins/grafana-chord-plugin-1.0.0.zip)
+
+Installing to a Grafana deployed on Kubernetes:
+
+In Grafana deployment manifest, configure the environment variable `GF_INSTALL_PLUGINS`
+as below:
+
+```yaml
+env:
+- name: GF_INSTALL_PLUGINS
+   value: "https://downloads.antrea.io/artifacts/grafana-custom-plugins/grafana-chord-plugin-1.0.0.zip;theia-grafana-chord-plugin"
+```
+
+### 2. Add the Panel to a Dashboard
+
+Installed panels are available immediately in the Dashboards section in your Grafana
+main menu, and can be added like any other core panel in Grafana. To see a list of
+installed panels, click the Plugins item in the main menu. Both core panels and
+installed panels will appear. For more information, visit the docs on [Grafana plugin installation](https://grafana.com/docs/grafana/latest/plugins/installation/).
+
+## Customization
+
+This plugin is built with [@grafana/toolkit](https://www.npmjs.com/package/@grafana/toolkit),
+which is a CLI that enables efficient development of Grafana plugins. To customize
+the plugin and do local testings:
 
 1. Install dependencies
 
    ```bash
+   cd grafana-chord-plugin
    yarn install
    ```
 
@@ -40,5 +137,6 @@ For more information about panels, refer to the documentation on [Panels](https:
 
 - [Build a panel plugin tutorial](https://grafana.com/tutorials/build-a-panel-plugin)
 - [Grafana documentation](https://grafana.com/docs/)
-- [Grafana Tutorials](https://grafana.com/tutorials/) - Grafana Tutorials are step-by-step guides that help you make the most of Grafana
+- [Grafana Tutorials](https://grafana.com/tutorials/) - Grafana Tutorials are step-by-step
+guides that help you make the most of Grafana
 - [Grafana UI Library](https://developers.grafana.com/ui) - UI components to help you build interfaces using Grafana Design System
